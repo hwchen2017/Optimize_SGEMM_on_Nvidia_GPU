@@ -7,6 +7,8 @@ System: Ubuntu 20.04 under WSL2
 
 Compiler: NVCC 10.1
 
+GPU: GTX 1660 supper
+
 Required compile flag: -lcublas
 
 ## Results
