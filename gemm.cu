@@ -1,5 +1,7 @@
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <unistd.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 // #include <omp.h>
@@ -7,75 +9,99 @@
 using namespace std;
 
 
-#define CUDA_KERNEL_CALLER(...) do{\
-  if(cudaPeekAtLastError() != cudaSuccess){\
-    printf("A CUDA error occurred prior to the kernel call %s at line %d\n", #__VA_ARGS__,  __LINE__); exit(1);\
-  }\
-  __VA_ARGS__;\
-  cudaError_t cuda_ret = cudaPeekAtLastError();\
-  if(cuda_ret != cudaSuccess){\
-    printf("CUDA Error at line %d in file %s\n", __LINE__, __FILE__);\
-    printf("  Error message: %s\n", cudaGetErrorString(cuda_ret));\
-    printf("  In the kernel call %s\n", #__VA_ARGS__);\
-    exit(1);\
-  }\
-}while(0)
-
-
-
-__global__ void matrixmul(float alpha, float *A, float *B, float beta, float *C, int N)
+void test_sgemm_kernel(int num, int N, float alpha, float beta, float *dA, float *dB, float *dC)
 {
-
-    int bx = blockIdx.x, by = blockIdx.y; 
-    int tx = threadIdx.x, ty = threadIdx.y; 
     
-    const int tile_size = 16; 
-    
-    __shared__ float As[tile_size][tile_size]; 
-    __shared__ float Bs[tile_size][tile_size]; 
- 
-    int abegin = by * tile_size * N; 
-    int aend = abegin + N -1;
-
-    int bbegin = tile_size * bx; 
-    int bstep = tile_size * N; 
-    
-    float Csub = 0.0; 
- 
-    for(int a = abegin, b = bbegin; a<=aend;  a += tile_size, b += bstep)
+    if(num == 0)
     {
-        As[ty][tx] = A[ a + N * ty + tx]; 
-        //Bs[tx][ty] = B[b + N*tx + ty ]; 
-        Bs[ty][tx] = B[b + N*ty + tx];
-
-        __syncthreads(); 
-           
-        for(int k=0;k<tile_size;k++)
-        {
-            Csub += As[ty][k] * Bs[k][tx]; 
-           // Csub += As[ty][k] * Bs[tx][k];
-        }
-     
-        __syncthreads(); 
+        dim3 blocks(N/32, N/32); 
+        dim3 threads(32, 32);
+        sgemm_v0<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
     }
- 
-    // int c = abegin + bbegin + N * ty + tx;
-    // C[c] = Csub; 
+    else if(num == 1)
+    {
+        dim3 blocks(N/32, N/32); 
+        dim3 threads(32, 32);
+        sgemm_v1<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+    else if(num == 2)
+    {
+        dim3 blocks(N/32, N/32); 
+        dim3 threads(32, 32);
+        sgemm_v2<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+    else if(num == 3)
+    {
+        dim3 blocks(N/32, N/32); 
+        dim3 threads(8, 32);
+        sgemm_v3<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+    else if(num == 4)
+    {
+        dim3 blocks(N/32, N/32); 
+        dim3 threads(8, 32);
+        sgemm_v4<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+    else if(num == 5)
+    {
+        dim3 blocks(N/64, N/64); 
+        dim3 threads(16, 16);
 
-    int id = abegin + bbegin + N * ty + tx;
-    C[id] = Csub * alpha + C[id]*beta;
+        sgemm_v5<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+    else if(num == 6)
+    {
+        dim3 blocks(N/128, N/128); 
+        int threads = 256;
+        sgemm_v6<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+    else if(num == 7)
+    {
+        dim3 blocks(N/128, N/128); 
+        int threads = 256;
+        sgemm_v7<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+    else if(num == 8)
+    {
+        dim3 blocks(N/128, N/128); 
+        int threads = 256;
+        sgemm_v8<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    }
+
+    // cudaDeviceSynchronize();
+
 
 }
 
 
 
 
- int main()
+int main(int argc, char* argv[])
  {
     
-    // cout<<"hello"<<endl; 
+    int kernel_num = 8;
+    int sys_size = 2048; 
 
-    int N = 2048; 
+    char ch; 
+    while((ch = getopt(argc, argv, "k:n:")) != EOF)
+    {
+        switch(ch)
+        {
+            case 'k' : kernel_num = atoi(optarg);
+            break; 
+            case 'n' : sys_size = atoi(optarg); 
+            break; 
+
+        }
+    }
+
+    if(kernel_num > 8 or kernel_num < 0)
+        kernel_num = 8; 
+
+    int N = sys_size; 
+
+    printf("\nMatrix Size: %d X %d\n", N, N ); 
+    cout<<"Kernel number: "<<kernel_num<<endl<<endl;
 
     float *A, *B, *C_ref, *gC; 
     int numbyte = sizeof(float) * N*N; 
@@ -147,15 +173,22 @@ __global__ void matrixmul(float alpha, float *A, float *B, float beta, float *C,
     cublasHandle_t err; 
     cublasCreate(&err); 
 
+    cublasSgemm(err, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, dA, N, dB, N, &beta, dC_ref, N);
+
+
     cudaEventRecord(start, 0);
 
-    cublasSgemm(err, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, dA, N, dB, N, &beta, dC_ref, N);
+    for(int i=0;i<10;i++)
+        cublasSgemm(err, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, dA, N, dB, N, &beta, dC_ref, N);
 
     cudaEventRecord(stop, 0); 
     cudaEventSynchronize(stop); 
     cudaEventElapsedTime(&ms, start, stop); 
+
+    ms /= 10.0; 
   
-    cout<<"CUBLAS Time Elapsed: "<<ms<<"ms"<<endl<<endl; 
+    cout<<"CUBLAS Time Elapsed: "<<ms<<"ms"<<endl; 
+    printf("FLOPS： %.3f GFLOPS\n\n", 2.*1e-6*N*N*N/ms);
 
     cudaMemcpy(C_ref, dC_ref, numbyte, cudaMemcpyDeviceToHost); 
 
@@ -167,11 +200,11 @@ __global__ void matrixmul(float alpha, float *A, float *B, float beta, float *C,
     
     cudaEventRecord(start, 0); 
     
-    dim3 blocks(16, 16); 
-    int threads = 256;
+    // dim3 blocks(16, 16); 
+    // int threads = 256;
     // dim3 threads(16, 16);
-
-    sgemm_v8<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    test_sgemm_kernel(kernel_num, N, alpha, beta, dA, dB, dC);
+    // sgemm_v8<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
 
     // mysgemm_v11<<<blocks, threads>>>(N, N, N, alpha, dA, dB, beta, dC);
     // matrixmul<<<blocks, threads>>>(1.0, dA, dB, 0.0, dC, N); 
@@ -180,9 +213,9 @@ __global__ void matrixmul(float alpha, float *A, float *B, float beta, float *C,
     cudaEventSynchronize(stop); 
     cudaEventElapsedTime(&ms, start, stop); 
   
-    cout<<"Time Elapsed: "<<ms<<"ms"<<endl<<endl; 
+    cout<<"Time Elapsed: "<<ms<<"ms"<<endl; 
 
-    printf("FLOPS： %.3f GFLOPS\n", 2.*1e-6*N*N*N/ms);
+    printf("FLOPS： %.3f GFLOPS\n\n", 2.*1e-6*N*N*N/ms);
   
     cudaMemcpy(gC, dC, numbyte, cudaMemcpyDeviceToHost); 
 
@@ -198,7 +231,8 @@ __global__ void matrixmul(float alpha, float *A, float *B, float beta, float *C,
     for(int i=0;i<N*N;i++)
         error = max(error, fabs(C_ref[i] - gC[i])); 
     
-    cout<<"Max error is: "<<error<<endl; 
+    printf("Max error is %.5f\n", error); 
+    // cout<<"Max error is: "<<error<<endl; 
 
 
     free(A); free(B); free(C_ref); free(gC); 
