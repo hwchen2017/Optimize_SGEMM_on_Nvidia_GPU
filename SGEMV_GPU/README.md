@@ -1,1 +1,3 @@
-# Optimize_SGEMV_on_Nvidia_GPU
+# SGEMV implementation on Nvidia GPU
+
+This repo contains several implementations of SGEMV on GPU. 
