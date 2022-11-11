@@ -200,11 +200,11 @@ int main(int argc, char* argv[])
     
     cudaEventRecord(start, 0); 
     
-    // dim3 blocks(16, 16); 
-    // int threads = 256;
+    dim3 blocks(16, 16); 
+    int threads = 256;
     // dim3 threads(16, 16);
-    test_sgemm_kernel(kernel_num, N, alpha, beta, dA, dB, dC);
-    // sgemm_v8<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
+    // test_sgemm_kernel(kernel_num, N, alpha, beta, dA, dB, dC);
+    sgemm_v8<<<blocks, threads>>>(alpha, dA, dB, beta, dC, N);
 
     // mysgemm_v11<<<blocks, threads>>>(N, N, N, alpha, dA, dB, beta, dC);
     // matrixmul<<<blocks, threads>>>(1.0, dA, dB, 0.0, dC, N); 

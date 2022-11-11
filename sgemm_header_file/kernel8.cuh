@@ -69,8 +69,8 @@ __global__ void sgemm_v8(float alpha, float *A, float *B, float beta, float *C, 
     int a = abegin, b = bbegin; 
     //load tile in A
     A_nxtile = *( (float4 *)(&A[a + N * cola + rowa]) );
-    *((float4 *)(&As[0][rowa + cola * Ns])) = A_nxtile;
 
+    *((float4 *)(&As[0][rowa + cola * Ns])) = A_nxtile;
 
     //load tile in B
     B_nxtile = *( (float4 *)(&B[b + N*colb + rowb]) );
