@@ -200,7 +200,7 @@ int main(int argc, char* argv[])
     
     cudaEventRecord(start, 0); 
     
-    dim3 blocks(16, 16); 
+    dim3 blocks(N/128, N/128); 
     int threads = 256;
     // dim3 threads(16, 16);
     // test_sgemm_kernel(kernel_num, N, alpha, beta, dA, dB, dC);

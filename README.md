@@ -1,6 +1,6 @@
 ## Optimize SGEMM on Nvidia GPU
 
-This repo contains several implementations of SGEMM on GPU. I tried different optimization techniques, such as iling, register blocking, prefetching, etc. The best implementation is `sgemm_header_file/kernel8.cuh`, and its result is shown below. 
+This repo contains several implementations of SGEMM on GPU. I tried different optimization techniques, such as iling, register blocking, prefetching, etc. The best implementation is `sgemm_header_file/kernel9.cuh`, and its result is shown below. 
 
 ## Test Environment
 System: Ubuntu 20.04 under WSL2
